@@ -24,6 +24,14 @@ std::string get_path_from_request(const std::string &request)
   return line.substr(line.find("GET") + 4, line.find("HTTP") - 5);
 }
 
+// parse 'GET /echo/<a-random-string>' into 'a-random-string' 
+std::string get_request_message(const std::string &path) 
+{
+  if(path.find("echo/") == std::string::npos) { return ""; }
+
+  std::string message = path.substr(path.find("echo/") + 5);
+  return message;
+}
 
 int main(int argc, char **argv) 
 {
@@ -89,20 +97,28 @@ int main(int argc, char **argv)
   std::string request(buffer);
 
   std::string path = get_path_from_request(request);
+  std::string message = get_request_message(path);
 
   std::string response = HTTP " ";
 
   // LOG
   std::cout << "Request: " << request << std::endl;
   std::cout << "Path: " << path << std::endl;
-  if(path != "/") 
+  std::cout << "Message: " << message << std::endl;
+
+  // OK conditions; if path == '/' or path == '/echo/<message>'
+  if (path == "/" || path.find("echo/") != std::string::npos) 
   {
-    response += NOT_FOUND CRLF CRLF;
+    response += OK CRLF;
+    response += "Content-Type: text/plain" CRLF;
+    response += "Content-Length: " + std::to_string(message.size()) + CRLF;
+    response += CRLF;
+    response += message;
   }
 
-  else
+  else 
   {
-    response += OK CRLF CRLF;
+    response += NOT_FOUND CRLF CRLF;
   }
 
   std::cout << "Response: " << response << std::endl;
