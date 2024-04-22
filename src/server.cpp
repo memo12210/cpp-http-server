@@ -8,6 +8,11 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 
+#define HTTP "HTTP/1.1"
+#define CRLF "\r\n"
+#define OK "200 OK"
+#define NOT_FOUND "404 Not Found"
+
 int main(int argc, char **argv) 
 {
   // You can use print statements as follows for debugging, they'll be visible when running tests.
@@ -51,10 +56,20 @@ int main(int argc, char **argv)
   int client_addr_len = sizeof(client_addr);
   
   std::cout << "Waiting for a client to connect...\n";
-  
-  accept(server_fd, (struct sockaddr *) &client_addr, (socklen_t *) &client_addr_len);
+
+  int client_fd = accept(server_fd, (struct sockaddr *) &client_addr, (socklen_t *) &client_addr_len);
+  if(client_fd < 0) 
+  {
+    std::cerr << "accept failed\n";
+    return 1;
+  }
+
   std::cout << "Client connected\n";
+
+  std::string response = HTTP " " OK CRLF CRLF;
+  send(client_fd, response.c_str(), response.size(), 0);
   
+  close(client_fd);
   close(server_fd);
 
   return 0;
