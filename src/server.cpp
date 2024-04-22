@@ -24,6 +24,16 @@ std::string get_path_from_request(const std::string &request)
   return line.substr(line.find("GET") + 4, line.find("HTTP") - 5);
 }
 
+std::string get_user_agent(const std::string &request) 
+{
+  // return the substring after "User-Agent: " until the next CRLF
+  std::string user_agent = request.substr(request.find("User-Agent: ") + 12, request.find(CRLF, request.find("User-Agent: ")) - request.find("User-Agent: ") - 12);
+
+  // trim the user agent string
+  while (user_agent.back() == ' ') { user_agent.pop_back(); }
+  return user_agent;
+}
+
 // parse 'GET /echo/<a-random-string>' into 'a-random-string' 
 std::string get_request_message(const std::string &path) 
 {
@@ -114,6 +124,15 @@ int main(int argc, char **argv)
     response += "Content-Length: " + std::to_string(message.size()) + CRLF;
     response += CRLF;
     response += message;
+  }
+
+  else if(path == "/user-agent") 
+  {
+    response += OK CRLF;
+    response += "Content-Type: text/plain" CRLF;
+    response += "Content-Length: " + std::to_string(get_user_agent(request).size()) + CRLF;
+    response += CRLF;
+    response += get_user_agent(request);
   }
 
   else 
