@@ -21,7 +21,7 @@ std::string get_path_from_request(const std::string &request)
   // if path does not contain GET, return empty string
   if (line.find("GET") == std::string::npos) { return ""; }
 
-  return line.substr(line.find("GET") + 2, line.find("HTTP") - 5);
+  return line.substr(line.find("GET") + 4, line.find("HTTP") - 5);
 }
 
 
@@ -92,7 +92,10 @@ int main(int argc, char **argv)
 
   std::string response = HTTP " ";
 
-  if(path.empty()) 
+  // LOG
+  std::cout << "Request: " << request << std::endl;
+  std::cout << "Path: " << path << std::endl;
+  if(path != "/") 
   {
     response += NOT_FOUND CRLF CRLF;
   }
@@ -101,6 +104,8 @@ int main(int argc, char **argv)
   {
     response += OK CRLF CRLF;
   }
+
+  std::cout << "Response: " << response << std::endl;
 
   send(client_fd, response.c_str(), response.size(), 0);
   
