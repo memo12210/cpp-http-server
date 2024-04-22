@@ -13,6 +13,18 @@
 #define OK "200 OK"
 #define NOT_FOUND "404 Not Found"
 
+std::string get_path_from_request(const std::string &request) 
+{
+  // path is contained in the first line of the request
+  std::string line = request.substr(0, request.find(CRLF));
+
+  // if path does not contain GET, return empty string
+  if (line.find("GET") == std::string::npos) { return ""; }
+
+  return line.substr(line.find("GET") + 2, line.find("HTTP") - 5);
+}
+
+
 int main(int argc, char **argv) 
 {
   // You can use print statements as follows for debugging, they'll be visible when running tests.
@@ -66,7 +78,30 @@ int main(int argc, char **argv)
 
   std::cout << "Client connected\n";
 
-  std::string response = HTTP " " OK CRLF CRLF;
+  char buffer[1024] = {0};
+  int valread = read(client_fd, buffer, 1023);
+  if (valread < 0) 
+  {
+    std::cerr << "read failed\n";
+    return 1;
+  }
+
+  std::string request(buffer);
+
+  std::string path = get_path_from_request(request);
+
+  std::string response = HTTP " ";
+
+  if(path.empty()) 
+  {
+    response += NOT_FOUND CRLF CRLF;
+  }
+
+  else
+  {
+    response += OK CRLF CRLF;
+  }
+
   send(client_fd, response.c_str(), response.size(), 0);
   
   close(client_fd);
