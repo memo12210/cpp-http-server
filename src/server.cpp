@@ -1,4 +1,5 @@
 #include <iostream>
+#include <vector>
 #include <cstdlib>
 #include <string>
 #include <cstring>
@@ -7,40 +8,61 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <thread>
+
+#include "http_operations.hpp"
 
 #define HTTP "HTTP/1.1"
 #define CRLF "\r\n"
 #define OK "200 OK"
 #define NOT_FOUND "404 Not Found"
 
-std::string get_path_from_request(const std::string &request) 
+void handle_client(int client_fd)
 {
-  // path is contained in the first line of the request
-  std::string line = request.substr(0, request.find(CRLF));
+  std::cout << "Client connected, handling request...\n";
 
-  // if path does not contain GET, return empty string
-  if (line.find("GET") == std::string::npos) { return ""; }
+  char buffer[1024] = {0};
+  int valread = read(client_fd, buffer, 1023);
+  if (valread < 0) 
+  {
+    std::cerr << "read failed\n";
+    close(client_fd);
+    return;
+  }
 
-  return line.substr(line.find("GET") + 4, line.find("HTTP") - 5);
-}
+  request req(buffer);
+  response res;
 
-std::string get_user_agent(const std::string &request) 
-{
-  // return the substring after "User-Agent: " until the next CRLF
-  std::string user_agent = request.substr(request.find("User-Agent: ") + 12, request.find(CRLF, request.find("User-Agent: ")) - request.find("User-Agent: ") - 12);
+  // OK conditions; if path == '/' or path == '/echo/<message>'
+  if (req.get_path() == "/" || req.get_path().find("echo/") != std::string::npos) 
+  {
+    res.set_status(OK);
+    res.set_content_type("text/plain");
+    res.set_content_length(std::to_string(req.get_message().size()));
+    res.set_message(req.get_message());
+    res.set_response_body();
+  }
 
-  // trim the user agent string
-  while (user_agent.back() == ' ') { user_agent.pop_back(); }
-  return user_agent;
-}
+  else if(req.get_path() == "/user-agent") 
+  {
+    res.set_status(OK);
+    res.set_content_type("text/plain");
+    res.set_content_length(std::to_string(req.get_user_agent().size()));
+    res.set_message(req.get_user_agent());
+    res.set_response_body();
+  }
 
-// parse 'GET /echo/<a-random-string>' into 'a-random-string' 
-std::string get_request_message(const std::string &path) 
-{
-  if(path.find("echo/") == std::string::npos) { return ""; }
+  else 
+  {
+    res.set_status(NOT_FOUND);
+    res.set_content_type("");
+    res.set_content_length("");
+    res.set_message("");
+    res.set_response_body();
+  }
 
-  std::string message = path.substr(path.find("echo/") + 5);
-  return message;
+  send(client_fd, res.get_response_body().c_str(), res.get_response_body().size(), 0);
+  close(client_fd);
 }
 
 int main(int argc, char **argv) 
@@ -82,70 +104,27 @@ int main(int argc, char **argv)
     return 1;
   }
 
-  struct sockaddr_in client_addr;
-  int client_addr_len = sizeof(client_addr);
+  std::cout << "Server started on port 4221, waiting for clients\n";
+
+  std::vector<std::thread> threads;
+
+  while(true)
+  {
+    struct sockaddr_in client_addr;
+    int client_addr_len = sizeof(client_addr);
+
+    std::cout << "Waiting for a client to connect...\n";
+    int client_fd = accept(server_fd, (struct sockaddr *) &client_addr, (socklen_t *) &client_addr_len);
+    if(client_fd < 0) 
+    {
+      std::cerr << "accept failed\n";
+      continue; // continue waiting for new clients
+    }
+
+    threads.push_back(std::thread(handle_client, client_fd)); // create a new thread to handle the client
+    threads.back().detach(); // detach the thread so that it can run independently
+  }
   
-  std::cout << "Waiting for a client to connect...\n";
-
-  int client_fd = accept(server_fd, (struct sockaddr *) &client_addr, (socklen_t *) &client_addr_len);
-  if(client_fd < 0) 
-  {
-    std::cerr << "accept failed\n";
-    return 1;
-  }
-
-  std::cout << "Client connected\n";
-
-  char buffer[1024] = {0};
-  int valread = read(client_fd, buffer, 1023);
-  if (valread < 0) 
-  {
-    std::cerr << "read failed\n";
-    return 1;
-  }
-
-  std::string request(buffer);
-
-  std::string path = get_path_from_request(request);
-  std::string message = get_request_message(path);
-
-  std::string response = HTTP " ";
-
-  // LOG
-  std::cout << "Request: " << request << std::endl;
-  std::cout << "Path: " << path << std::endl;
-  std::cout << "Message: " << message << std::endl;
-
-  // OK conditions; if path == '/' or path == '/echo/<message>'
-  if (path == "/" || path.find("echo/") != std::string::npos) 
-  {
-    response += OK CRLF;
-    response += "Content-Type: text/plain" CRLF;
-    response += "Content-Length: " + std::to_string(message.size()) + CRLF;
-    response += CRLF;
-    response += message;
-  }
-
-  else if(path == "/user-agent") 
-  {
-    response += OK CRLF;
-    response += "Content-Type: text/plain" CRLF;
-    response += "Content-Length: " + std::to_string(get_user_agent(request).size()) + CRLF;
-    response += CRLF;
-    response += get_user_agent(request);
-  }
-
-  else 
-  {
-    response += NOT_FOUND CRLF CRLF;
-  }
-
-  std::cout << "Response: " << response << std::endl;
-
-  send(client_fd, response.c_str(), response.size(), 0);
-  
-  close(client_fd);
   close(server_fd);
-
   return 0;
 }

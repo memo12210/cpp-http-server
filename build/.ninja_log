@@ -1,0 +1,7 @@
+# ninja log v5
+3	568	1713945755813023945	CMakeFiles/server.dir/src/server.cpp.o	d541270c41b4bbf0
+643	753	1713945755993024024	server	d39ea197b3be6ff
+3	643	1713945755885023977	CMakeFiles/server.dir/src/http_operations.cpp.o	9c2f3b00dabf90c2
+4	575	1713970558218880361	CMakeFiles/server.dir/src/http_operations.cpp.o	9c2f3b00dabf90c2
+5	697	1713970558342882433	CMakeFiles/server.dir/src/server.cpp.o	d541270c41b4bbf0
+697	861	1713970558506885174	server	d39ea197b3be6ff
