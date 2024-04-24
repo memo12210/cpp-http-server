@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 #include <vector>
 #include <cstdlib>
 #include <string>
@@ -6,6 +7,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <thread>
@@ -17,7 +19,7 @@
 #define OK "200 OK"
 #define NOT_FOUND "404 Not Found"
 
-void handle_client(int client_fd)
+void handle_client(int client_fd, char* argv[])
 {
   std::cout << "Client connected, handling request...\n";
 
@@ -51,6 +53,37 @@ void handle_client(int client_fd)
     res.set_message(req.get_user_agent());
     res.set_response_body();
   }
+  
+  // for the case when the path is /files/<filename>
+  // If <filename> exists in <directory>, respond with a 200 OK response
+  else if(strcmp(argv[2],"--directory") && req.get_path().find("/files/") != std::string::npos)
+  {
+    std::string file_path = argv[2] + req.get_path().substr(7);
+    struct stat sb;
+
+    if(stat(file_path.c_str(), &sb) == 0 && !(sb.st_mode & S_IFDIR)) 
+    {
+      res.set_status(OK);
+      res.set_content_type("application/octet-stream"); // binary file
+      res.set_content_length(std::to_string(sb.st_size));
+
+      // response should contain the contents of the file
+      std::ifstream file(file_path, std::ios::binary);
+      std::string file_contents((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+      res.set_message(file_contents);
+      res.set_response_body();
+
+    }
+
+    else 
+    {
+      res.set_status(NOT_FOUND);
+      res.set_content_type("");
+      res.set_content_length("");
+      res.set_message("");
+      res.set_response_body();
+    }
+  }
 
   else 
   {
@@ -65,7 +98,7 @@ void handle_client(int client_fd)
   close(client_fd);
 }
 
-int main(int argc, char **argv) 
+int main(int argc, char* argv[]) 
 {
   // You can use print statements as follows for debugging, they'll be visible when running tests.
   std::cout << "Logs from your program will appear here!\n";
@@ -121,10 +154,10 @@ int main(int argc, char **argv)
       continue; // continue waiting for new clients
     }
 
-    threads.push_back(std::thread(handle_client, client_fd)); // create a new thread to handle the client
+    threads.push_back(std::thread(handle_client, client_fd,argv)); // create a new thread for the client
     threads.back().detach(); // detach the thread so that it can run independently
   }
-  
+
   close(server_fd);
   return 0;
 }
