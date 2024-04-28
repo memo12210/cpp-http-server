@@ -36,41 +36,8 @@ void handle_client(int client_fd, char* argv[])
   request req(buffer);
   response res;
 
-  // TODO: if request mode is POST, handle the request and return CREATE response
-
-  if(req.get_method() == "POST" && req.get_path().find("/files/") != std::string::npos) 
-  {
-    std::string filename = req.get_path().substr(7);
-    std::string directory = argv[2];
-    std::string file_path = directory + "/" + filename;
-
-    std::ofstream outfile(file_path,std::ios::binary);
-    if(!outfile.is_open())
-    {
-      // If failed to open the file, send a 404 response
-      res.set_status(NOT_FOUND);
-      res.set_content_type("");
-      res.set_content_length("");
-      res.set_message("");
-      res.set_response_body();
-    }
-
-    else
-    {
-      // If the file is opened successfully, write the message to the file
-      outfile << req.get_message();
-      outfile.close();
-
-      res.set_status(CREATED);
-      res.set_content_type("text/plain");
-      res.set_content_length(std::to_string(req.get_message().size()));
-      res.set_message(req.get_message());
-      res.set_response_body();
-    }
-  }
-
   // if path == '/' or path == '/echo/<message>'
-  else if(req.get_path() == "/" || req.get_path().find("echo/") != std::string::npos) 
+  if(req.get_path() == "/" || req.get_path().find("echo/") != std::string::npos) 
   {
     res.set_status(OK);
     res.set_content_type("text/plain");
@@ -91,23 +58,46 @@ void handle_client(int client_fd, char* argv[])
   
   // for the case when the path is /files/<filename>
   // If <filename> exists in <directory>, respond with a 200 OK response
-  else if(strcmp(argv[2],"--directory") && req.get_path().find("/files/") != std::string::npos)
+  else if(strcmp(argv[2],"--directory") == 0 && req.get_path().find("/files/") != std::string::npos)
   {
+    // TODO: if request mode is POST, handle the request and return CREATE response
+    // if request mode is GET, handle the request and return OK response
+
+    std::cout << "File request,";
+
     std::string file_path = argv[2] + req.get_path().substr(7);
     struct stat sb;
 
+    // check if the file does exist
     if(stat(file_path.c_str(), &sb) == 0 && !(sb.st_mode & S_IFDIR)) 
     {
-      res.set_status(OK);
-      res.set_content_type("application/octet-stream"); // binary file
-      res.set_content_length(std::to_string(sb.st_size));
+      if(req.get_method() == "POST")
+      {
+        std::cout << "POST request\n";
+        std::ofstream file(file_path);
+        file << req.get_message();
+        file.close();
 
-      // response should contain the contents of the file
-      std::ifstream file(file_path, std::ios::binary);
-      std::string file_contents((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-      res.set_message(file_contents);
-      res.set_response_body();
+        res.set_status(CREATED);
+        res.set_content_type("");
+        res.set_content_length("");
+        res.set_message("");
+        res.set_response_body();
+      }
 
+      else
+      {
+        std::cout << "GET request\n";
+        res.set_status(OK);
+        res.set_content_type("application/octet-stream"); // binary file
+        res.set_content_length(std::to_string(sb.st_size));
+
+        // response should contain the contents of the file
+        std::ifstream file(file_path, std::ios::binary);
+        std::string file_contents((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+        res.set_message(file_contents);
+        res.set_response_body();
+      }
     }
 
     else 
