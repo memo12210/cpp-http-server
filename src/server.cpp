@@ -17,6 +17,7 @@
 #define HTTP "HTTP/1.1"
 #define CRLF "\r\n"
 #define OK "200 OK"
+#define CREATED "201 Created"
 #define NOT_FOUND "404 Not Found"
 
 void handle_client(int client_fd, char* argv[])
@@ -35,8 +36,41 @@ void handle_client(int client_fd, char* argv[])
   request req(buffer);
   response res;
 
-  // OK conditions; if path == '/' or path == '/echo/<message>'
-  if (req.get_path() == "/" || req.get_path().find("echo/") != std::string::npos) 
+  // TODO: if request mode is POST, handle the request and return CREATE response
+
+  if(req.get_method() == "POST" && req.get_path().find("/files/") != std::string::npos) 
+  {
+    std::string filename = req.get_path().substr(7);
+    std::string directory = argv[2];
+    std::string file_path = directory + "/" + filename;
+
+    std::ofstream outfile(file_path,std::ios::binary);
+    if(!outfile.is_open())
+    {
+      // If failed to open the file, send a 404 response
+      res.set_status(NOT_FOUND);
+      res.set_content_type("");
+      res.set_content_length("");
+      res.set_message("");
+      res.set_response_body();
+    }
+
+    else
+    {
+      // If the file is opened successfully, write the message to the file
+      outfile << req.get_message();
+      outfile.close();
+
+      res.set_status(CREATED);
+      res.set_content_type("text/plain");
+      res.set_content_length(std::to_string(req.get_message().size()));
+      res.set_message(req.get_message());
+      res.set_response_body();
+    }
+  }
+
+  // if path == '/' or path == '/echo/<message>'
+  else if(req.get_path() == "/" || req.get_path().find("echo/") != std::string::npos) 
   {
     res.set_status(OK);
     res.set_content_type("text/plain");
@@ -45,6 +79,7 @@ void handle_client(int client_fd, char* argv[])
     res.set_response_body();
   }
 
+  // for the case when the path is user-agent
   else if(req.get_path() == "/user-agent") 
   {
     res.set_status(OK);
